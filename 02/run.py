@@ -5,47 +5,53 @@ sys.path.append('..')
 from shared.aoc import __AOC
 from shared import log
 
+rock = 1
+paper = 2
+scissors = 3
+
+win = 6
+lose = 0
+draw = 3
+
+opponent = { 'A': rock, 'B': paper, 'C': scissors }
+player = { 'X': rock, 'Y': paper, 'Z': scissors }
+outcome = { 'X': lose, 'Y': draw, 'Z': win }
+
+games = {
+    (rock, rock, draw),
+    (rock, paper, win),
+    (rock, scissors, lose),
+    (paper, rock, lose),
+    (paper, paper, draw),
+    (paper, scissors, win),
+    (scissors, rock, win),
+    (scissors, paper, lose),
+    (scissors, scissors, draw)
+}
+
+def parser_a(s):
+    parts = s.split(' ')
+    return (opponent[parts[0]], player[parts[1]])
+
+def parser_b(s):
+    parts = s.split(' ')
+    return (opponent[parts[0]], outcome[parts[1]])
+
 class AOC(__AOC):
 
     def __init__(self):
         super().__init__(day=2)
 
+    def get_input(self, parser):
+        return map(parser, super().get_input())
+
     def A(self):
-        lookup = {
-            'A X': (1 + 3),   # rock:rock = draw
-            'A Y': (2 + 6),   # rock:paper = win
-            'A Z': (3 + 0),   # rock:scissors = loss
-            'B X': (1 + 0),   # paper:rock = loss
-            'B Y': (2 + 3),   # paper:paper = draw
-            'B Z': (3 + 6),   # paper:scissors = win
-            'C X': (1 + 6),   # scissors:rock = win
-            'C Y': (2 + 0),   # scissors:paper = loss
-            'C Z': (3 + 3)    # scissors:scissors = draw
-        }
-        return sum([ lookup[p] for p in self.get_input() ])
+        lookup = { (g[0], g[1]): g[2] for g in games }      # (opponent's play, player's play): outcome
+        return sum([ p[1] + lookup[p] for p in list(self.get_input(parser_a)) ])    # player's play + outcome
 
     def B(self):
-        lookup = {
-            # choose to lose. the first number in the pair is
-            # the value of your choice, the second is the value of the loss
-            'A X': (3 + 0),   # rock:scissors = loss
-            'B X': (1 + 0),   # paper:rock = loss
-            'C X': (2 + 0),   # scissors:paper = loss
-
-            # choose to draw. the first number in the pair is
-            # the value of your choice, the second is the value of the draw
-            'A Y': (1 + 3),   # rock:rock = draw
-            'B Y': (2 + 3),   # paper:paper = draw
-            'C Y': (3 + 3),   # scissors:scissors = draw
-
-            # choose to win. the first number in the pair is
-            # the value of your choice, the second is the value of the win
-            'A Z': (2 + 6),   # rock:paper = win
-            'B Z': (3 + 6),   # paper:scissors = win
-            'C Z': (1 + 6)    # scissors:rock = win
-        }
-        
-        return sum([ lookup[p] for p in self.get_input() ])
+        lookup = { (g[0], g[2]): g[1] for g in games }      # (oppenent's play, outcome): player's play
+        return sum([ p[1] + lookup[p] for p in list(self.get_input(parser_b)) ])    # outcome + player's play
 
 if __name__ == "__main__":
     AOC().run()
