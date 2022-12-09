@@ -15,7 +15,7 @@ class AOC(__AOC):
         return (parts[0], int(parts[1]))
 
     def get_input(self):
-        return [ self.parse_input(l) for l in super().get_input() ]
+        return [ self.parse_input(l) for l in super().get_input() if l[0] != '#' ]
 
     def move_head(self, h, m):
         x, y = h
@@ -31,45 +31,44 @@ class AOC(__AOC):
         else:
             raise Exception(f'unknown dir: {dir}')
 
-#       log.info(f'move_head: {h} -> {m} -> ({x}, {y})')
         return (x, y)
  
     def is_adjacent(self, h, t):
         return (abs(h[0] - t[0]) <= 1) and (abs(h[1] - t[1]) <= 1)
 
-    def move_tail(self, h, t):
-        moves = []
-        T = t
-        while not self.is_adjacent(h, t):
-            if (t[1] == h[1]) and (t[0] != h[0]):   # in the same row
-                incr = 1 if h[0] > t[0] else -1
-                t = (t[0] + incr, t[1])
-            elif (t[1] != h[1]) and (t[0] == h[0]): # in the same column
-                incr = 1 if h[1] > t[1] else -1
-                t = (t[0], t[1] + incr) 
-            else:                                   # gotta move diagonally
-                x_incr = 1 if h[0] > t[0] else -1
-                y_incr = 1 if h[1] > t[1] else -1
-                t = (t[0] + x_incr, t[1] + y_incr)
-            moves.append(t)
-
-#       log.info(f'   move_tail: {T} - {h} -> {moves}')
-        new_t = moves[-1] if len(moves) > 0 else t
-        return moves, new_t 
+    def move(self, a, b):
+        if (b[1] == a[1]) and (b[0] != a[0]):   # in the same row
+            incr = 1 if a[0] > b[0] else -1
+            return (b[0] + incr, b[1])
+        elif (b[1] != a[1]) and (b[0] == a[0]): # in the same column
+            incr = 1 if a[1] > b[1] else -1
+            return (b[0], b[1] + incr) 
+        else:                                   # gotta move diagonally
+            x_incr = 1 if a[0] > b[0] else -1
+            y_incr = 1 if a[1] > b[1] else -1
+            return (b[0] + x_incr, b[1] + y_incr)
         
-    def A(self):
-        h = t = (0, 0)
-        head_moves = self.get_input()
-        tail_moves = [[(0, 0)]]
-        for m in head_moves:
-            h = self.move_head(h, m)                
-            moves, t = self.move_tail(h, t)
-            tail_moves.append(moves)
+    def move_rope(self, num_knots):
 
-        return len(set([ m for tm in tail_moves for m in tm ]))
+        knots = [ (0,0) for i in range(num_knots) ]
+        places = set([])
+        for move in self.get_input():
+            newhead = self.move_head(knots[0], move)
+            while (knots[0] != newhead):
+                for i in range(len(knots)):
+                    if i == 0:
+                        knots[i] = self.move(newhead, knots[i])
+                    elif not self.is_adjacent(knots[i-1], knots[i]): 
+                        knots[i] = self.move(knots[i-1] if i > 0 else newhead, knots[i])
+                places.add(knots[-1])
+
+        return len(places)
+
+    def A(self):
+        return self.move_rope(2)
 
     def B(self):
-        return None
+        return self.move_rope(10)
 
 if __name__ == "__main__":
     AOC().run()
