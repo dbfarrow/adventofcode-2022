@@ -18,20 +18,13 @@ class AOC(__AOC):
         return [ self.parse_input(l) for l in super().get_input() if l[0] != '#' ]
 
     def move_head(self, h, m):
-        x, y = h
-        dir, dist = m
-        if dir == 'U':
-            y += dist
-        elif dir == 'D':
-            y -= dist
-        elif dir == 'L':
-            x -= dist
-        elif dir == 'R':
-            x += dist
-        else:
-            raise Exception(f'unknown dir: {dir}')
-
-        return (x, y)
+        moves = {
+            'U': (h[0], h[1] + m[1]),
+            'D': (h[0], h[1] - m[1]),
+            'R': (h[0] + m[1], h[1]),
+            'L': (h[0] - m[1], h[1]),
+        }
+        return moves[m[0]]
  
     def is_adjacent(self, h, t):
         return (abs(h[0] - t[0]) <= 1) and (abs(h[1] - t[1]) <= 1)
