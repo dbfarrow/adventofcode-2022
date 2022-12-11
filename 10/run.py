@@ -90,7 +90,7 @@ class AOC(__AOC):
                 raise Exception('huh?')
             
             # if the sprite overlaps the current crt pos, oupput a '#' otherwise, output a '.'
-            display += '#' if abs(crt - x) <= 1 else '.'
+            display += '#' if abs(crt - x) <= 1 else ' '
             crt += 1
             if crt % 40 == 0:
                 log.info(display)
