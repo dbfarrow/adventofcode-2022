@@ -27,6 +27,8 @@ input_parser = Lark(r'''
 
 ''', parser='lalr', lexer='basic', transformer=TreeToList())
 
+verbose = False
+
 class AOC(__AOC):
 
     def __init__(self):
@@ -37,7 +39,7 @@ class AOC(__AOC):
         a = [ i for i in a if i != None ]
         b = [ i for i in b if i != None ]
     
-#       log.info(f'comparing: {a} <> {b}')
+        log.debug(f'comparing: {a} <> {b}')
         for i in range(len(a)):
             va = a[i]
             try:
@@ -51,26 +53,26 @@ class AOC(__AOC):
     
             if (tva == int) and (tvb == int):
                 if va < vb:
-#                   log.info(f'a < b; good signal at i={i} ( {va} < {vb} )')
+                    log.debug(f'a < b; good signal at i={i} ( {va} < {vb} )')
                     return True
                 elif va > vb:
                     raise Exception(f'a > b; bad signal at i={i} ( {va} > {vb} )')
     
             if (tva == list) and (tvb == list) and self.compare_lists(va, vb):
-#               log.info('recursion; good signal')
+                log.debug('recursion; good signal')
                 return True
             if (tva == list) and (tvb != list) and self.compare_lists(va, [ vb ]):
-#               log.info('[ vb ] + recursion; good signal')
+                log.debug('[ vb ] + recursion; good signal')
                 return True
             if (tva != list) and (tvb == list) and self.compare_lists([ va ], vb):
-#               log.info('[ va ] + recursion; good signal')
+                log.debug('[ va ] + recursion; good signal')
                 return True
     
         if len(a) < len(b): 
-#           log.info('a is out of items')
+            log.debug('a is out of items')
             return True
     
-#       log.info('no clear good signal; keep looking')
+        log.debug('no clear good signal; keep looking')
         return False
     
     def compare_signals(self, a, b):
@@ -80,11 +82,11 @@ class AOC(__AOC):
         try:
             good = self.compare_lists(a, b)
         except Exception as e:
-#           log.info(f'definitive bad signal order detected: {e}')
+            log.debug(f'definitive bad signal order detected: {e}')
             good = False
     
-#       log.info(f'{a} <> {b} == {good}')
-#       log.info('')
+        log.debug(f'{a} <> {b} == {good}')
+        log.debug('')
         return good
     
     def comparator(self, a, b):
@@ -97,7 +99,7 @@ class AOC(__AOC):
     
         comparisons = { i+1: self.compare_signals(lines[i*3], lines[i*3+1]) for i in range(npairs) }
         good_signals = [ i for i in comparisons if comparisons[i] ]
-#       log.info(good_signals)
+        log.debug(good_signals)
         return sum(good_signals)
 
     def B(self):
@@ -110,7 +112,7 @@ class AOC(__AOC):
         answer = 1
         for ix, s in enumerate(signals):
             if s in decoder: answer *= (ix + 1)
-#           log.info(s)
+            log.debug(s)
 
         return answer
 

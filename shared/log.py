@@ -4,6 +4,7 @@ class bcolors:
     OKBLUE = '\033[94m'
     OKYELLOW = '\033[33m'
     OKGREEN = '\033[92m'
+    OKCYAN = '\033[36m'
     WARNING = '\033[93m'
     FAIL = '\033[91m'
     ENDC = '\033[0m'
@@ -19,7 +20,7 @@ context = LogContext()
 
 def debug(msg):
     if context.debug:
-        print(f'{bcolors.FAIL}[DEBUG]{bcolors.ENDC} {msg}')
+        print(f'{bcolors.OKCYAN}[%] {msg} {bcolors.ENDC}')
 
 def info(msg):
     print(f'{bcolors.OKYELLOW}[+] {msg}{bcolors.ENDC}')
