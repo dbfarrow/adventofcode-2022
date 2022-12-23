@@ -13,51 +13,14 @@ class AOC(__AOC):
     def get_input(self):
         return list(map(int, super().get_input()))
 
-    def get_offset(self, ix, enc, dec):
+    def get_offset(self, eix, dec):
+        loc = [ ix for ix, de in enumerate(dec) if de[1] == eix ]
+        assert len(loc) == 1, 'wt?'
+        return loc[0]
 
-        # get *all* instances of the value at enc[ix] between enc[0] and enc[ix]
-        # to tell us *which* instance of the value we need to be looking for
-        # in dec
-        es = [ e for e in enc[0:ix + 1] if e == enc[ix] ]
-        e = enc[ix]
-        if len(es) > 1:
-            log.debug(f'looking for instance number {len(es)} of {enc[ix]}')
-            offset = 0
-            for i in range(len(es)):
-                log.info(f'   starting search for {e} at {offset}') 
-                offset = dec.index(e, offset) 
-                log.info(f'   found an instance at {offset}') 
-        else:
-            offset = dec.index(enc[ix])
+    def decode(self, dec, wrap):
 
-        return offset
-
-    def A(self):
-
-        enc = self.get_input()
-        dec = self.get_input()
-        wrap = len(enc)
-
-        log.debug(dec)
-
-        for ix, e in enumerate(enc):
-
-            # locate e in the decryption buffer
-            x = self.get_offset(ix,enc, dec)
-#           log.debug(f'value {e} is found at index {x} of enc')
-            if e == 0: 
-#               log.debug(dec)
-                continue
-
-            dec.pop(x)
-            new_pos = (x + e) % (wrap - 1)
-            if new_pos == 0:
-                new_pos = wrap if e < 0 else 0
-
-#           log.debug(f'{ix}: {e} starts at {x} and moves to {new_pos}')
-            dec.insert(new_pos, e)
-#           log.debug(dec)
-        
+        dec = [ d[0] for d in dec ]
         zpos = dec.index(0)
         for i in range(1, 4):
             x = ((i * 1000) + zpos) % wrap
@@ -65,8 +28,46 @@ class AOC(__AOC):
 
         return sum([ dec[((i * 1000) + zpos) % wrap] for i in range(1, 4) ])
 
+    def mix(self, enc, dec, wrap):
+
+        for ix, e in enumerate(enc):
+
+            # locate e in the decryption buffer
+            x = self.get_offset(ix, dec)
+            log.debug(f'value {e} is found at index {x} of enc')
+            if e == 0: 
+                log.debug([ d[0] for d in dec ])
+                continue
+
+            dec.pop(x)
+            new_pos = (x + e) % (wrap - 1)
+            if new_pos == 0:
+                new_pos = wrap if e < 0 else 0
+
+            log.debug(f'{e} starts at {x} and moves to {new_pos}')
+            dec.insert(new_pos, (e, ix))
+            log.debug([ d[0] for d in dec ])
+        
+        return dec
+
+    def A(self):
+        enc = self.get_input()
+        dec = [ (e, ix) for ix, e in enumerate(enc) ]
+        wrap = len(dec)
+        mixed = self.mix(enc, dec, wrap)
+        return self.decode(mixed, wrap)        
+
     def B(self):
-        return None
+        enc = [ 811589153 * e for e in self.get_input() ]
+        dec = [ (e, ix) for ix, e in enumerate(enc) ]
+        wrap = len(enc)
+
+        log.debug([ d[0] for d in dec ])
+        for i in range(10):
+            dec = self.mix(enc, dec, wrap)
+            log.debug([ d[0] for d in dec ])
+ 
+        return self.decode(dec, wrap)
 
 if __name__ == "__main__":
     AOC().run()
