@@ -1,0 +1,128 @@
+#!/usr/bin/env python3
+import sys
+sys.path.append('..')
+
+from collections import defaultdict
+import re
+from shared.aoc import __AOC
+from shared import log
+
+class Node():
+    
+    def __init__(self, data):
+
+        p = 'Valve ([A-Z]+) has flow rate=([0-9]+); tunnels? leads? to valves? ([A-Z, ]+)'
+        m = re.match(p, data)
+        assert m != None, f'failed to parse: {data}'
+    
+        self.name = m.group(1)
+        self.rate = int(m.group(2))
+        self.neighbors = [ s.strip() for s in m.group(3).split(',') ]
+        self.open = False
+
+    def __repr__(self):
+        return f'{self.name}: rate = {self.rate:02}; neighbors: {",".join(self.neighbors)}'
+        
+class Graph:
+
+    def __init__(self, nodes):
+
+        self.nodes = { n.name: n for n in nodes }
+        self.graph = defaultdict(list)
+        for node in nodes:
+            for n in node.neighbors:
+                self.graph[node].append(self.nodes[n])
+                self.graph[self.nodes[n]].append(node)
+       
+    def __repr__(self):
+        r = ''
+        for k, v in self.graph.items():
+            r += f'  {k}: {v}\n'
+        return r
+
+    def all_nodes(self):
+        return self.nodes.values()
+
+    def shortest_path(self, start, end):
+
+        visited = []
+        moves = [[ start ]]
+
+        if start == end:
+            return []
+
+        while moves:
+            path = moves.pop(0)
+            node = path[-1]
+
+            if node not in visited:
+                neighbors = self.graph[node]
+                for n in neighbors:
+                    new = list(path)
+                    new.append(n)
+                    moves.append(new)
+
+                    if n == end:
+#                       for p in new:
+#                           log.info(p)
+                        return new
+
+                visited.append(node)
+
+        return []
+
+class AOC(__AOC):
+
+    def __init__(self):
+        super().__init__(day=16) 
+
+    def A(self):
+
+        graph = Graph([ Node(i) for i in self.get_input() ])
+        start = graph.nodes['AA']
+        log.debug(start)
+
+        deadline = 30
+        t = 0
+        total = 0
+        while t < deadline:
+
+            moves = {}
+            for end in graph.all_nodes():
+                sp = graph.shortest_path(start, end)
+                if len(sp) == 0: continue
+
+#               if sp[-1].name == 'JJ':
+#                   for s in sp:
+#                       log.info(s)
+
+                time_remaining = deadline - t
+                release_duration = time_remaining - len(sp) 
+                value = release_duration * sp[-1].rate
+#               log.debug(f'moving {len(sp)} places to {sp[-1].name}: release_duration: {release_duration}, rate: {sp[-1].rate}, value: {value}')
+                moves[value] = (sp[-1], len(sp))
+
+#           for k, v in moves.items():
+#               log.debug(f'{k}: {v.name}')
+    
+            if len(moves) == 0:
+                break
+
+            max_release = max([ k for k, v in moves.items() if not v[0].open ])
+            (to_open, steps) = moves[max_release]
+            to_open.open = True
+            log.debug(f't[{t:02}]: moving {steps} steps and opening {to_open} results in {max_release} pressure released')
+#           log.debug('')
+
+            start = to_open
+            t += steps
+            total += max_release
+#           break
+
+        return total
+
+    def B(self):
+        return None
+
+if __name__ == "__main__":
+    AOC().run()
