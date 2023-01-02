@@ -2,7 +2,6 @@
 import sys
 sys.path.append('..')
 
-from item import Item
 from sides import parse_sides
 from junglemap import FlatMap, CubeMap
 from collections import defaultdict
