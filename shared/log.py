@@ -18,6 +18,10 @@ class LogContext:
 
 context = LogContext()
 
+def trace(msg):
+    if context.debug and context.trace:
+        print(f'{bcolors.OKCYAN}[ ] {msg} {bcolors.ENDC}')
+
 def debug(msg):
     if context.debug:
         print(f'{bcolors.OKCYAN}[%] {msg} {bcolors.ENDC}')

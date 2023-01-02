@@ -15,11 +15,17 @@ class __AOC:
         parser = argparse.ArgumentParser(description=f"AdventOfCode {self.year} - day {self.day}")
         parser.add_argument('-t', '--testing', action='store_true', default=False)
         parser.add_argument('-v', '--verbose', action='store_true', default=False)
+        parser.add_argument('-vv', '--trace', action='store_true', default=False)
         parser.add_argument('-p', '--part')
+        self.parse_cmdline_extra(parser)
         self.cmdline = parser.parse_args()
 
-        log.context.debug = self.cmdline.verbose 
+        log.context.debug = self.cmdline.verbose or self.cmdline.trace
+        log.context.trace = self.cmdline.trace
         log.info(f'log.context.debug: {log.context.debug}')
+
+    def parse_cmdline_extra(self, parser):
+        return
 
     def get_input(self):
 

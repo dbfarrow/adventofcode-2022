@@ -1,7 +1,10 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3 
 import sys
 sys.path.append('..')
 
+from item import Item
+from sides import parse_sides
+from junglemap import FlatMap, CubeMap
 from collections import defaultdict
 from shared.aoc import __AOC
 from shared import log
@@ -11,12 +14,6 @@ class AOC(__AOC):
     def __init__(self):
         super().__init__(day=22)
 
-        self.movement = {
-            'N': { 'move': (0, -1), 'L': 'W', 'R': 'E', 'score': 3 },
-            'S': { 'move': (0,  1), 'L': 'E', 'R': 'W', 'score': 1 },
-            'E': { 'move': (1,  0), 'L': 'N', 'R': 'S', 'score': 0 },
-            'W': { 'move': (-1, 0), 'L': 'S', 'R': 'N', 'score': 2 },
-        }
         self.paths = defaultdict(int)
 
     def get_input(self):
@@ -45,111 +42,87 @@ class AOC(__AOC):
                 if c.isdigit():
                     tmpstr += c
                 else:
-                    dirs.append((int(tmpstr), c))
+                    dirs.extend([int(tmpstr), c])
                     tmpstr = ''
+
+            # get the last move. this bit me right in the butt
+            dirs.append(int(tmpstr))
  
         return (mapp, dirs)
 
-    def find_start(self, mapp):
+    def solve(self, mapp, dirs, maptype, pos = None):
 
-        for y, r in enumerate(mapp):
-            for x, c in enumerate(r):
-                if c == '.': return (x, y)
-                    
-        raise Exception('cannot find start of map')
+        if not pos:
+            pos = ((8, 0), '>') if self.cmdline.testing else ((50, 0), '>')
 
-    def move(self, mapp, start, dirs):
-
-        log.debug(f'moving {dirs[0]} spaces {start[1]} from {start[0]} then turning {dirs[1]}')
-
-        movement = self.movement[start[1]]
-        end = start[0]
-        for i in range(dirs[0]):
-
-            try:
-                x = end[0] + movement['move'][0]
-                y = end[1] + movement['move'][1]
-                if start[1] in [ 'E', 'W' ]:
-                    if (x >= len(mapp[y])) or ((mapp[y][x] == ' ') and start[1] == 'E'):
-                        # wrap around the right edge
-                        x -= 1
-                        while (x >= 0 and (mapp[y][x] != ' ')): 
-                            x -= 1
-                        x += 1
-                        log.debug(f'wrapping x around right edge to {x}')
-                        self.paths['right'] += 1
-
-                    elif (x < 0) or ((mapp[y][x] == ' ') and start[1] == 'W'):
-                        # wrap around the left edge
-                        x += 1
-                        while (x < len(mapp[y]) and (mapp[y][x] != ' ')):
-                            x += 1
-                        x -= 1
-                        log.debug(f'wrapping x around left edge to {x}')
-                        self.paths['left'] += 1
-                
-                if start[1] in [ 'N', 'S' ]:
-                    if (y >= len(mapp)) or ((mapp[y][x] == ' ') and start[1] == 'S'):
-                        y -= 1
-                        while (y >= 0) and (mapp[y][x] != ' '):
-                            y -= 1
-                        y += 1
-                        log.debug(f'wrapping y around bottom edge to {y}')
-                        self.paths['bottom'] += 1
-
-                    elif (y < 0) or ((mapp[y][x] == ' ') and start[1] == 'N'):
-                        y += 1
-                        while (y < len(mapp)) and (mapp[y][x] != ' '):
-                            y += 1
-                        y -= 1
-                        log.debug(f'wrapping y around top edge to {y}')
-                        self.paths['top'] += 1
-    
-                log.debug((x, y))
-                if mapp[y][x] == '#':
-                    log.debug(f'cannot move to {x},{y} because of a wall')
-                    break
+        actual = []
+        while len(dirs) > 0:
+            num_steps = dirs.pop(0)
+            turn_dir = dirs.pop(0) if len(dirs) > 0 else None
+            log.debug(f'-------')
+            log.debug(f'moving {num_steps} steps heading {pos[1]} from {pos[0]} then turning {turn_dir}')
+            path = maptype(mapp, pos)
+            for i in range(num_steps):
+                moved = path.next()
+                if moved:
+                    log.debug(f'  new position: {path.current}')
                 else:
-                    end = (x, y)
-            except Exception as e:
-                log.failure(f'exception {e} at ({x}, {y})')
-                log.failure(f'start: {start}')
-                log.failure(f'move : {dirs}')
-                log.failure(f'mapp length: {len(mapp)}')
-                log.failure(f'mapp width : {len(mapp[0])}')
-                log.failure(f'mapp width on row {y}: {len(mapp[y])}')
-                raise e
+                    log.debug(f'  path blocked at {path.current}')
+                    break
+            if moved: i += 1
+            actual.extend([i, turn_dir])
+            old_heading = pos[1]
+            new_heading = path.calc_turn(path.current, turn_dir)
+            log.debug(f'reached destination for this leg at {path.current}. turning {turn_dir} from old heading {old_heading} to {new_heading}')
+            pos = ((path.current.x, path.current.y), new_heading)
+            log.debug(f'')
 
-        return (end, movement[dirs[1]])
+        return pos, actual
 
-    def display(self, mapp):
-        for r in mapp:
-            log.info(r)
-        log.info('')
+    def calc_score(self, pos):
+        scores = [ '>', 'v', '<', '^' ]
+        col, row = pos[0]
+        heading = pos[1]
+        log.debug(f'calc_score: row: {row}, col: {col}, heading: {heading}')
+        return ((row + 1) * 1000) + ((col + 1) * 4) + scores.index(heading) 
+ 
+    def parse_cmdline_extra(self, parser):
+        parser.add_argument('--test_cubes', action='store_true', default=False)
+        parser.add_argument('--backtrack', action='store_true', default=False)
 
     def A(self):
-
         mapp, dirs = self.get_input()
-        pos = (self.find_start(mapp), 'E')
-        log.info(pos)
-        
-        for dd in dirs:
-            pos = self.move(mapp, pos, dd)
-            log.debug(pos)
-            log.debug('')
-
-        log.info(f'ended at: {pos}')
-        coord = pos[0]
-        ddir = pos[1]
-        passwd = (1000 * (coord[1] + 1)) + (4 * (coord[0] + 1)) + self.movement[ddir]['score']
-
-        for  p in self.paths:
-            log.info(f'{p}: {self.paths[p]}')
-
-        return passwd
+        end, actual =  self.solve(mapp, dirs, FlatMap)
+        return self.calc_score(end)
 
     def B(self):
-        return None
+
+        mapp, dirs = self.get_input()
+
+        if not self.cmdline.test_cubes:
+            end, actual =  self.solve(mapp, dirs, CubeMap)
+            pw = self.calc_score(end)
+            log.info(f'path ended at {end} with pw={pw}')
+
+            if self.cmdline.backtrack:
+                # FOR DEBUGGING
+                # retrace our steps to see if we end up at the start like we should
+                # compute the return path from the actual path taken
+                path_back = []
+                for s in actual:
+                    if s == None: continue
+                    elif s == 'R': path_back.insert(0, 'L')
+                    elif s == 'L': path_back.insert(0, 'R')
+                    else: path_back.insert(0, s)
+        
+                headings = [ '>', 'v', '<', '^' ]
+                reverse_heading = headings[(headings.index(end[1]) + 2) % 4]
+                end = (end[0], reverse_heading)
+                log.info(f'retracing our steps from {end}') 
+                end, actual = self.solve(mapp, path_back, CubeMap, end)
+                log.info(f'    we are at: {end}') 
+
+            return pw
 
 if __name__ == "__main__":
     AOC().run()
