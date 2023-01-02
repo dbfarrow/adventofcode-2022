@@ -77,6 +77,7 @@ class AOC(__AOC):
             pos = ((path.current.x, path.current.y), new_heading)
             log.debug(f'')
 
+        pos = path.unrotate(pos)
         return pos, actual
 
     def calc_score(self, pos):

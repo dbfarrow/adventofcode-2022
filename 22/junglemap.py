@@ -2,27 +2,35 @@
 import sys
 sys.path.append('..')
 
-import argparse
 from collections import defaultdict
-from item import Item
 from sides import parse_sides
 from shared import log
 
-CLOCKWISE = 0
-COUNTERCLOCKWISE = 1
+def rotate_heading(heading, count):
+
+    headings = [ '<', '^', '>', 'v' ]
+    offset = headings.index(heading)
+    return headings[(offset + count) % 4]        
+
+#
+# Items are used by the CubeMap Sides to represent the x, y coordinates and value at that
+# location in the source data file. For example, in the test data set, the top left corner 
+# (coord 0,) of the top surface of the cube hold the item ((8, 0), '.') 
+#
+class Item:
+
+    def __init__(self, x, y, v):
+
+        self.x = x
+        self.y = y
+        self.v = v
+        self.next = None
+        self.prev = None
+
+    def __repr__(self):
+        return f'({self.x},{self.y}): {self.v}'
 
 class BaseMap:
-
-    def __init__(self, mapp, pos):
-
-        self.mapp = mapp
-        self.x, self.y = pos[0]
-        self.heading = pos[1]
-        self.preinit()
-
-        # create the list of items
-        self.items = self.get_items(mapp)
-        self.link_items()
 
     def link_items(self):
 
@@ -40,6 +48,10 @@ class BaseMap:
         assert len(items) <= 1, 'dups in list?'
         return items[0] if len(items) == 1 else None
 
+    def unrotate(self, pos):
+        log.info('unrotate means nothing to me')
+        return pos
+
 class FlatMap(BaseMap):
 
     def __init__(self, mapp, pos):
@@ -48,15 +60,12 @@ class FlatMap(BaseMap):
         self.x, self.y = pos[0]
         self.heading = pos[1]
 
-        # create the list of items
-        self.items = self.get_items(mapp)
-        self.link_items()
-
-    def get_items(self, mapp):
+        # create the list of items and link them together
         if self.heading in [ '>', '<' ]:
-            return [ Item(x, self.y, v) for x, v in enumerate(mapp[self.y]) if v != ' ' ]
+            self.items = [ Item(x, self.y, v) for x, v in enumerate(mapp[self.y]) if v != ' ' ]
         else:
-            return [ Item(self.x, y, r[self.x]) for y, r in enumerate(mapp) if r[self.x] != ' ' ]
+            self.items = [ Item(self.x, y, r[self.x]) for y, r in enumerate(mapp) if r[self.x] != ' ' ]
+        self.link_items()
 
     def next(self):
 
@@ -75,17 +84,8 @@ class FlatMap(BaseMap):
 
     def calc_turn(self, pos, turn):
 
-        turns = {
-            '^': { 'L': '<', 'R': '>' },
-            'v': { 'L': '>', 'R': '<' },
-            '>': { 'L': '^', 'R': 'v' },
-            '<': { 'L': 'v', 'R': '^' },
-        }
-
         if not turn: return self.heading 
-        new_heading = turns[self.heading][turn]
-        log.debug(f'calculating turn direction for {self.current} with heading {self.heading} to {new_heading}')
-        return new_heading
+        return rotate_heading(self.heading, 1 if turn == 'R' else -1)
 
 class CubeMap(BaseMap):
 
@@ -112,26 +112,28 @@ class CubeMap(BaseMap):
         self.forward = side.is_forward(self.axis, self.heading)
 
         # rotate the sides so that they are aligned on the axis
-        sides = []
+        rotated_sides = []
         for ix, name in enumerate(self.axes[self.axis]['sides']):
             rot = self.axes[self.axis]['rotations'][ix]
             curr_side = self.sides[name]
             pp = curr_side.rotate(curr_side.points, rot)
-            sides.append(pp)
+            rotated_sides.append(pp)
 
         # get the row and col offset of the initial point. that will be relevant
-        # when translating the path to other sides of the cube
-        for side in sides:
-            offsets = [ (x, y) for x in range(self.sidelen) for y in range(self.sidelen) if side[y][x] == (self.x, self.y) ]
+        # when translating the path to other sides of the cube. there is certainly
+        # a more efficient way of finding this but i ran out of energy before
+        # optimizing this
+        for rotated in rotated_sides:
+            offsets = [ (x, y) for x in range(self.sidelen) for y in range(self.sidelen) if rotated[y][x] == (self.x, self.y) ]
             if len(offsets) == 1:
                 col_offset, row_offset = offsets[0]
                 break
         log.trace(f'offsets for path: row_offset: {row_offset}, col_offset: {col_offset}')
 
-        # create the list of items
+        # create the list of points on the axis
         points = []
         for ix, name in enumerate(self.axes[self.axis]['sides']):
-            side = sides[ix]
+            side = rotated_sides[ix]
             if self.axis in ['x', 'y']:
                 ii = [ side[row_offset][i] for i in range(self.sidelen) ]
             else:
@@ -146,6 +148,7 @@ class CubeMap(BaseMap):
 
             points.extend(ii)
 
+        # then turn the list of points into Item objects and link them together
         self.items = [ Item(p[0], p[1], self.mapp[p[1]][p[0]]) for p in points ]
         self.link_items()
 
@@ -195,103 +198,14 @@ class CubeMap(BaseMap):
 
     def calc_turn(self, pos, turn):
 
-        turns = {
-            '^': { 'L': '<', 'R': '>' },
-            'v': { 'L': '>', 'R': '<' },
-            '>': { 'L': '^', 'R': 'v' },
-            '<': { 'L': 'v', 'R': '^' },
-        }
-
         if not turn: return self.heading 
 
         # calculate the side that the current point is on. we don't care
         # about proper rotation here, just what side the current point is on
-        log.debug(f'  calculating new heading for {pos}')
-        for side in self.sides.values():
-            offsets = [ (x, y) for x in range(self.sidelen) for y in range(self.sidelen) if side.points[y][x] == (pos.x, pos.y) ]
-            if len(offsets) == 1: break
-         
+        side = self.calc_side(pos.x, pos.y)
         log.debug(f'  current point is on {side.name}, travel is forward={self.forward}, turning {turn}')
         return side.calc_turn(self.axis, self.forward, turn)
 
-
-
-def test_flat_map(mapp):
-
-    data = {
-        (((8, 0), '>'), 5),
-        (((4, 5), 'v'), 5),
-    }
-
-    for pos, num_steps in data:
-
-        log.debug(f'testing {num_steps} in each direction from {pos}')
-
-        path = FlatMap(mapp, pos)
-        steps = [ (p.x, p.y) for p in path.items ]
-        stepstr = ', '.join([ f'({s[0]:02},{s[1]:02})' for s in steps ])
-        symbols = ''.join([ mapp[step[1]][step[0]] for step in steps ])
-        log.info(f'{pos}: {stepstr}: {symbols}')
-
-def test_cube_map(mapp):
-
-    data = [
-        (((8, 0), '>'), [ (5, 'R'), (2, 'L'), (5, None) ], ((14, 9), 'v')),
-#       (((0, 4), '<'), 20),
-#       (((8, 4), 'v'), 20),
-#       (((15, 8), 'v'), 20),
-#       (((8, 0), 'v'), 20),
-#       (((14, 10), 'v'), 20),
-#       (((6, 5), '^'), 20),
-    ]
-
-    for start, steps, end in data:
-        curr = start
-        log.info(f'moving {steps} starting at {start}:')
-        for num_steps, turn_dir in steps:
-            log.debug(f'-------')
-            log.debug(f'moving {num_steps} steps heading {curr[1]} from {curr[0]} then turning {turn_dir}')
-            path = CubeMap(mapp, curr)
-            for i in range(num_steps):
-                moved = path.next()
-                if moved:
-                    log.debug(f'  new position: {path.current}')
-                else:
-                    log.debug(f'  path blocked at {path.current}')
-#                   break
-
-            old_heading = curr[1]
-            new_heading = path.calc_turn(path.current, turn_dir)
-            log.debug(f'reached destination for this leg at {path.current}. turning {turn_dir} from old heading {old_heading} to {new_heading}')
-            log.debug(f'')
-            curr = ((path.current.x, path.current.y), new_heading)
-        if start != end:
-            log.failure(f'  expected: {end}, got {curr}')
-
-
-if __name__ == "__main__":
-
-    parser = argparse.ArgumentParser(description=f"Jungle Map Test")
-    parser.add_argument('-t', '--testing', action='store_true', default=False)
-    parser.add_argument('-v', '--verbose', action='store_true', default=False)
-    parser.add_argument('-vv', '--trace', action='store_true', default=False)
-    cmdline = parser.parse_args()
-
-    log.context.debug = cmdline.verbose or cmdline.trace
-    log.context.trace = cmdline.trace
-    log.info(f'log.context.debug: {log.context.debug}')
-
-    mapp = []
-    filename = './input-test' if cmdline.testing else './input'
-    with open('./input-test', 'r') as infile:
-        for l in [ l.rstrip() for l in infile ]:
-            if len(l) == 0: break
-            mapp.append(l)
-
-        map_width = max(set([ len(l) for l in mapp ]))
-        mapp = [ (l + (' '*map_width))[0:map_width] for l in mapp ]
-
-#   test_flat_map(mapp)
-    test_cube_map(mapp)
-
-
+    def unrotate(self, pos):
+        side = self.calc_side(pos[0][0], pos[0][1])
+        return (pos[0], rotate_heading(pos[1], -side.rotation))

@@ -31,21 +31,10 @@ def parse_sides(mapp):
             2: [ (Left, 1), (Bottom, 0), None ],
             3: [ (Back, 1), None, None ]
         },
-        (12,16): {
-            0: [ None, (Top, 0), (Right, 1) ],
-            1: [ None, (Front, 0), None ],
-            2: [ (Left, 1), (Bottom, 0), None ],
-            3: [ (Back, 1), None, None ]
-        }
     }
 
     cube_sides = {}
-    if dim == (16,12):
-        nrows = 3
-        ncols = 4
-    elif dim in [ (150,200), (12,16) ]:
-        nrows = 4
-        ncols = 3
+    nrows, ncols = (3, 4) if dim == (16,12) else (4, 3)
     
     sidelen = dim[0] // ncols
     for y in range(nrows):
@@ -56,10 +45,10 @@ def parse_sides(mapp):
                 side = cls(mapp, dim, (x, y), sidelen)
                 if rot != 0:
                     side.points = side.rotate(side.points, rot)
+                    side.rotation = rot
                 cube_sides[side.name] = side
-#               side.print()
+                side.print()
  
-#   exit(-1)
     return cube_sides
 
 
@@ -72,6 +61,7 @@ class Side:
         self.name = self.__class__.__name__.lower()
         self.position = position
         self.sidelen = sidelen
+        self.rotation = 0
 
         X = self.position[0]
         Y = self.position[1]
@@ -126,21 +116,6 @@ class Side:
 
         return points
 
-    def get_items(self, axis, offsets):
-    
-        # this is the base way that item collection works. when
-        # traversal of a specific axis requires adjustment of the
-        # order in which items are collected, then the specific Side
-        # class has to handle that
-        col_offset, row_offset = offsets
-        ii = [ self.points[row_offset][i] for i in range(self.sidelen) ]
-
-        log.debug(f'getting items for {self.name} on axis {axis}: row_offset: {row_offset}, col_offset: {col_offset}')
-        self.print()
-        log.trace(ii)
-        log.trace('')
-        return ii
-
     def calc_turn(self, axis, moving_forward, turn):
         log.debug(f'doot: calc_turn: name: {self.name}, axis: {axis}, moving_forward: {moving_forward}, turn: {turn}')
         return self.turns[(axis, moving_forward)][turn]
@@ -154,7 +129,7 @@ class Top(Side):
         ( 'z', True): { 'L': '>', 'R': '<' },
         ( 'z', False): { 'L': '<', 'R': '>' },
     }
-            
+
 class Bottom(Side):
 
     turns = {
@@ -168,29 +143,9 @@ class Bottom(Side):
         # on the bottom, the direction of travel indicated by 
         # left and right on the z axis are reversed
         forward = super().is_forward(axis, heading)
-        if axis == 'y': # and heading in [ '>', '<' ]:
-            forward = not forward
-#       elif axis == 'z' and not forward:
-#           forward = not forward
-        return forward
-
-    def get_items(self, axis, offsets):
-    
-        if axis == 'x': return super().get_items(axis, x, y)
-
-        col_offset, row_offset = offsets
         if axis == 'y':
-            row_offset = self.sidelen - row_offset - 1
-            col_offset = self.sidelen - col_offset - 1
-            ii = list(reversed([ self.points[self.sidelen - row_offset - 1][i] for i in range(self.sidelen) ]))
-        elif axis == 'z':
-            ii = [ self.points[i][col_offset] for i in range(self.sidelen) ] 
-
-        log.debug(f'getting items for {self.name} on axis {axis}: row_offset: {row_offset}, col_offset: {col_offset}')
-        self.print()
-        log.trace(ii)
-        log.trace('')
-        return ii
+            forward = not forward
+        return forward
 
 
 class Left(Side):
@@ -210,25 +165,6 @@ class Left(Side):
             forward = not forward
         return forward
 
-    def get_offset(axis, x, y):
-        if axis == 'y':
-            row_offset = x
-            col_offset = y
-
-    def get_items(self, axis, offsets):
-    
-        if axis != 'y': return super().get_items(axis, x, y)
-
-        # swap the row and col offsets
-        row_offset, col_offset = offsets
-        log.debug(f'getting items for {self.name} on axis {axis}: row_offset: {row_offset}, col_offset: {col_offset}')
-        ii = list(reversed([ self.points[i][row_offset] for i in range(self.sidelen) ]))
-
-        self.print()
-        log.trace(ii)
-        log.trace('')
-        return ii
-
 class Right(Side):
 
     turns = {
@@ -237,27 +173,6 @@ class Right(Side):
         ( 'y', True): { 'L': '>', 'R': '<' },
         ( 'y', False): { 'L': '<', 'R': '>' },
     }
-
-    def get_offset(axis, x, y):
-
-        if axis == 'y':
-            row_offset = self.sidelen - x - 1
-            col_offset = y
-        else:
-            return super().get_offset(axis, x, y)
-
-    def get_items(self, axis, offsets):
-    
-        if axis != 'y': return super().get_items(axis, offsets)
-
-        col_offset, row_offset = offsets
-        ii = [ self.points[i][self.sidelen - row_offset - 1] for i in range(self.sidelen) ]
-
-        log.debug(f'getting items for {self.name} on axis {axis}: row_offset: {row_offset}, col_offset: {col_offset}')
-        self.print()
-        log.trace(ii)
-        log.trace('')
-        return ii
 
 class Front(Side):
 
@@ -280,6 +195,6 @@ class Back(Side):
     def is_forward(self, axis, heading):
         forward = super().is_forward(axis, heading)
         if axis == 'z':
-            forward = (heading == '^')
+            forward = not forward
         return forward
 
